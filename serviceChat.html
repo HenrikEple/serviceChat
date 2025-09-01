@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Eplehuset Service Chat – Full Page</title>
+  <style>
+    :root {
+      --brand: #6CC24A;
+      --ink: #121212;
+      --ink-2: #444;
+      --line: #e9e9e9;
+      --bg: #f7f7f7;
+      --card: #fff;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial; color: var(--ink); background: var(--bg); }
+    a { color: inherit; }
+
+    /* Layout */
+    .app { display: grid; grid-template-rows: auto 4px 1fr auto; height: 100vh; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: #fff; border-bottom: 1px solid var(--line); }
+    .brand { display: flex; gap: 10px; align-items: center; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 6px rgba(108,194,74,.15); }
+    .title { font-weight: 600; letter-spacing: .2px; }
+
+    .progressbar { width: 100%; height: 4px; background: #eaeaea; }
+    .progressbar > div { height: 100%; background: var(--brand); width: 0%; transition: width .25s ease; }
+
+    .main { display: grid; grid-template-columns: 1fr minmax(320px, 380px); gap: 18px; padding: 18px; }
+
+    .chat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; display: grid; grid-template-rows: 1fr auto; overflow: hidden; }
+    .feed { padding: 14px; overflow: auto; display: flex; flex-direction: column; gap: 10px; background: #fafafa; }
+
+    .msg { max-width: 74ch; padding: 10px 12px; border-radius: 14px; font-size: 15px; line-height: 1.45; box-shadow: 0 1px 0 rgba(0,0,0,.03); }
+    .msg.assistant { background: #fff; border: 1px solid #eee; }
+    .msg.user { align-self: flex-end; background: #1f1f1f; color: #fff; border-bottom-right-radius: 6px; }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip { background: #f0f5ef; color: #2a6f1e; border: 1px solid rgba(108,194,74,.25); padding: 6px 10px; border-radius: 999px; font-size: 12px; cursor: pointer; }
+    .chip:hover { background: #eaf2e8; }
+    .hint { margin-top: 6px; color: #666; font-size: 12px; }
+
+    .composer { border-top: 1px solid var(--line); padding: 10px; background: #fff; display: grid; gap: 8px; }
+    .inputRow { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+    .input { resize: none; min-height: 52px; max-height: 180px; border: 1px solid #e5e5e5; border-radius: 12px; padding: 12px; outline: none; background: #fff; font-size: 15px; }
+    .input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(108,194,74,.18); }
+    .send { height: 52px; width: 52px; display: grid; place-items: center; background: var(--brand); color: #fff; border: none; border-radius: 12px; cursor: pointer; }
+
+    .side { display: grid; gap: 18px; align-content: start; }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+    .panel h3 { margin: 6px 6px 8px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+    .kv { display: grid; grid-template-columns: 120px 1fr; font-size: 14px; gap: 8px; padding: 8px; border-radius: 10px; }
+    .kv:nth-child(odd) { background: #fafafa; }
+    .kv .key { color: #666; }
+
+    .actions { display: flex; gap: 8px; }
+    .btn { border: 1px solid #e0e0e0; background: #fff; border-radius: 10px; padding: 8px 10px; cursor: pointer; font-size: 14px; }
+    .btn.primary { border-color: var(--brand); background: var(--brand); color: #fff; }
+
+    .footer { border-top: 1px solid var(--line); padding: 12px 18px; background: #fff; font-size: 12px; color: #666; }
+
+    @media (max-width: 980px) { .main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div id="app" class="app">
+    <header class="topbar">
+      <div class="brand"><span class="dot"></span><span class="title">Eplehuset Service</span></div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <select id="locale" aria-label="Språk" style="border:1px solid var(--line);border-radius:8px;padding:6px 8px;">
+          <option value="nb" selected>NO</option>
+          <option value="en">EN</option>
+        </select>
+      </div>
+    </header>
+    <div class="progressbar"><div id="progress"></div></div>
+    <main class="main">
+      <section class="chat">
+        <div id="feed" class="feed" role="log" aria-live="polite"></div>
+        <div class="composer">
+          <div class="inputRow">
+            <textarea id="input" class="input" rows="3" placeholder="Skriv meldingen din…"></textarea>
+            <button id="send" class="send" title="Send" aria-label="Send">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M20 12L4 4l2.2 6L4 16l16-4z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="side">
+        <div class="panel">
+          <h3>Oppsummering</h3>
+          <div id="summary">
+            <div class="kv"><div class="key">Modell</div><div class="val" id="s-model">—</div></div>
+            <div class="kv"><div class="key">Feilbeskrivelse</div><div class="val" id="s-fault">—</div></div>
+          </div>
+          <div class="actions" style="margin-top:10px;">
+            <button class="btn" data-edit="model">Rediger modell</button>
+            <button class="btn" data-edit="fault_description">Rediger beskrivelse</button>
+          </div>
+          <div class="actions" style="margin-top:10px;">
+            <button id="submit" class="btn primary">Bekreft og send</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Hurtigvalg</h3>
+          <div class="chips">
+            <button class="chip" data-chip="Opprett ny sak">Opprett ny sak</button>
+            <button class="chip" data-chip="Sjekk status">Sjekk status</button>
+            <button class="chip" data-chip="Snakk med menneske">Snakk med menneske</button>
+          </div>
+        </div>
+      </aside>
+    </main>
+    <footer class="footer">Demo. OpenAI og innsending er stubber du kan koble til dine endepunkter.</footer>
+  </div>
+
+  <script>
+    const t = {
+      nb: {
+        helloTitle: 'Hei! Klar for å registrere en service?',
+        helloSub: 'Jeg hjelper deg å opprette en sak på 1–2 minutter.',
+        collectingNote: 'Jeg trenger litt info for å opprette saken.',
+        chipNewCase: 'Opprett ny sak', chipStatus: 'Sjekk status', chipAgent: 'Snakk med menneske',
+        askModel: 'Hvilket produkt gjelder det? Skriv nøyaktig modell. Eksempel: iPhone 13 Pro eller MacBook Pro 14 (2021).',
+        hintModel: 'Du finner modellen i Innstillinger • Om, på esken, eller på kvitteringen.',
+        askFault: 'Beskriv feilen så detaljert som mulig. Når oppstår den, hvordan ser den ut, og hva har du prøvd?',
+        hintFault: 'Tips: tidslinje, feilmeldinger, lyd, varme, batteri, væske, og annet som hjelper diagnosen.',
+        noted: (k) => `Notert ${k}.`,
+        needMore: (k) => `Takk. Jeg trenger litt mer detaljer for ${k}.`,
+        submitted: 'Sak opprettet',
+        submittedSub: 'Takk. Vi har opprettet saken din.'
+      },
+      en: {
+        helloTitle: 'Hi! Ready to register a service case?',
+        helloSub: 'I will help you create a case in about 1–2 minutes.',
+        collectingNote: 'I need a little info to create your case.',
+        chipNewCase: 'Create new case', chipStatus: 'Check status', chipAgent: 'Talk to a person',
+        askModel: 'Which product is it? Please write the exact model. Example: iPhone 13 Pro or MacBook Pro 14 (2021).',
+        hintModel: 'You can find the model in Settings • About, on the box, or on your receipt.',
+        askFault: 'Describe the fault with enough detail. When does it happen, what does it look like, and what have you tried?',
+        hintFault: 'Tips: timeline, error messages, sounds, heat, battery, liquid, anything that helps us diagnose.',
+        noted: (k) => `Noted ${k}.`,
+        needMore: (k) => `Thanks. I need a bit more detail for ${k}.`,
+        submitted: 'Case created',
+        submittedSub: 'Thanks. Your case has been created.'
+      }
+    };
+
+    const state = {
+      locale: 'nb',
+      messages: [],
+      caseData: { model: null, fault_description: null },
+      checklistVersion: '2025-09-01',
+      conversationId: Math.random().toString(36).slice(2),
+      submitting: false
+    };
+
+    const schema = [
+      { key: 'model', label: { nb: 'modell', en: 'model' }, required: true,
+        validate: (v) => typeof v === 'string' && v.trim().length >= 3,
+        ask: (loc) => t[loc].askModel, hint: (loc) => t[loc].hintModel },
+      { key: 'fault_description', label: { nb: 'feilbeskrivelse', en: 'fault description' }, required: true,
+        validate: (v) => typeof v === 'string' && v.trim().split(/\s+/).length >= 8,
+        ask: (loc) => t[loc].askFault, hint: (loc) => t[loc].hintFault }
+    ];
+
+    /* -------- UI helpers -------- */
+    const el = (sel) => document.querySelector(sel);
+    const feed = el('#feed');
+    const input = el('#input');
+    const sendBtn = el('#send');
+    const progressBar = el('#progress');
+
+    function escapeHTML(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function md(s){ return escapeHTML(s).replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>'); }
+
+    function addMsg(role, content, meta={}){
+      const wrap = document.createElement('div');
+      wrap.className = `msg ${role}`;
+      wrap.innerHTML = md(content);
+      feed.appendChild(wrap);
+      if (meta.hint){
+        const hint = document.createElement('div');
+        hint.className = 'hint';
+        hint.textContent = meta.hint;
+        feed.appendChild(hint);
+      }
+      if (meta.chips){
+        const chips = document.createElement('div');
+        chips.className = 'chips';
+        meta.chips.forEach(c => {
+          const b = document.createElement('button');
+          b.className = 'chip'; b.textContent = c; b.dataset.chip = c;
+          b.addEventListener('click', () => onChip(c));
+          chips.appendChild(b);
+        });
+        feed.appendChild(chips);
+      }
+      feed.scrollTop = feed.scrollHeight + 999;
+      updateProgress();
+    }
+
+    function updateSummary(){
+      el('#s-model').textContent = state.caseData.model || '—';
+      el('#s-fault').textContent = state.caseData.fault_description || '—';
+    }
+
+    function updateProgress(){
+      const need = schema.filter(f => f.required).length;
+      const have = schema.filter(f => f.required && state.caseData[f.key]).length;
+      const pct = Math.round((have/need)*100);
+      progressBar.style.width = pct + '%';
+    }
+
+    function askFor(key){
+      const f = schema.find(s => s.key === key); if (!f) return;
+      addMsg('assistant', f.ask(state.locale), { hint: f.hint(state.locale) });
+    }
+
+    function nextPending(){ return schema.find(f => f.required && !state.caseData[f.key]); }
+
+    function startFlow(){
+      const p = nextPending();
+      if (p) askFor(p.key);
+    }
+
+    function onChip(value){
+      addMsg('user', value);
+      if (value.includes(t[state.locale].chipNewCase)) startFlow();
+      else if (value.includes(t[state.locale].chipStatus)) addMsg('assistant', 'Sporing er ikke aktiv i demoen.');
+      else if (value.includes(t[state.locale].chipAgent)) addMsg('assistant', 'Kø til menneskelig agent er ikke aktiv i demoen.');
+    }
+
+    function handleSend(){
+      const text = (input.value || '').trim();
+      if (!text) return;
+      addMsg('user', text);
+      input.value = '';
+      processUserText(text);
+    }
+
+    /* -------- Demo connectors -------- */
+    async function sendToOpenAI(messages, systemPrompt=''){
+      // Replace with your proxy route
+      await new Promise(r => setTimeout(r, 120));
+      return { role: 'assistant', content: 'OpenAI demo svar' };
+    }
+
+    async function submitServiceCase(payload){
+      await new Promise(r => setTimeout(r, 350));
+      return { caseId: 'EH-' + String(Math.floor(Math.random()*1e6)).padStart(6,'0') };
+    }
+
+    /* -------- Flow logic -------- */
+    async function processUserText(text){
+      // Simulate an OpenAI assist call. Keep placeholder for wiring later.
+      await sendToOpenAI([
+        { role: 'system', content: 'Du hjelper med å samle inn service data' },
+        { role: 'user', content: text }
+      ]);
+
+      const pending = nextPending();
+      if (!pending) { offerSummary(); return; }
+      const f = pending;
+      if (f.validate(text)) {
+        state.caseData[f.key] = text;
+        addMsg('assistant', t[state.locale].noted(f.label[state.locale]));
+        updateSummary();
+        const nxt = nextPending();
+        if (nxt) askFor(nxt.key); else offerSummary();
+      } else {
+        addMsg('assistant', t[state.locale].needMore(f.label[state.locale]));
+      }
+    }
+
+    function offerSummary(){
+      const card = document.createElement('div');
+      card.className = 'msg assistant';
+      card.innerHTML = '<div class="card"><div style="font-weight:600;margin-bottom:6px;">Oppsummering</div>' +
+        '<div class="kv"><div class="key">Modell</div><div class="val">' + escapeHTML(state.caseData.model || '—') + '</div></div>' +
+        '<div class="kv"><div class="key">Feilbeskrivelse</div><div class="val">' + escapeHTML(state.caseData.fault_description || '—') + '</div></div>' +
+        '<div style="margin-top:10px;display:flex;gap:8px;">' +
+          '<button class="btn" data-edit="model">Rediger modell</button>' +
+          '<button class="btn" data-edit="fault_description">Rediger beskrivelse</button>' +
+          '<button class="btn primary" id="confirm">Bekreft og send</button>' +
+        '</div></div>';
+      feed.appendChild(card);
+      feed.scrollTop = feed.scrollHeight + 999;
+      card.querySelector('[data-edit="model"]').addEventListener('click', () => askFor('model'));
+      card.querySelector('[data-edit"fault_description"]').addEventListener('click', () => askFor('fault_description'));
+      card.querySelector('#confirm').addEventListener('click', submitCase);
+    }
+
+    async function submitCase(){
+      if (state.submitting) return; state.submitting = true;
+      const payload = {
+        checklistVersion: state.checklistVersion,
+        conversationId: state.conversationId,
+        locale: state.locale,
+        case: { ...state.caseData }
+      };
+      try {
+        const res = await submitServiceCase(payload);
+        addMsg('assistant', `**${t[state.locale].submitted}**\n${t[state.locale].submittedSub}\nSaksnummer: \`${res.caseId}\``);
+        // Download payload for demo
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        addMsg('assistant', `Last ned innsendt data: <a download="service-case-${Date.now()}.json" href="${url}">service-case.json</a>`);
+        state.caseData = { model: null, fault_description: null };
+        updateSummary();
+        updateProgress();
+      } catch (e) {
+        addMsg('assistant', 'Beklager, noe gikk galt ved innsending. Prøv igjen.');
+      } finally { state.submitting = false; }
+    }
+
+    /* -------- Wire events -------- */
+    sendBtn.addEventListener('click', handleSend);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } });
+    document.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => askFor(btn.dataset.edit)));
+    document.querySelectorAll('[data-chip]').forEach(btn => btn.addEventListener('click', () => onChip(btn.dataset.chip)));
+    document.getElementById('submit').addEventListener('click', submitCase);
+    document.getElementById('locale').addEventListener('change', (e) => {
+      state.locale = e.target.value; addMsg('assistant', state.locale === 'nb' ? 'Språk satt til norsk.' : 'Language set to English.');
+    });
+
+    /* -------- Boot -------- */
+    (function boot(){
+      addMsg('assistant', `**${t[state.locale].helloTitle}**\n${t[state.locale].helloSub}`);
+      addMsg('assistant', t[state.locale].collectingNote, { chips: [t[state.locale].chipNewCase, t[state.locale].chipStatus, t[state.locale].chipAgent] });
+      updateSummary();
+      updateProgress();
+    })();
+  </script>
+</body>
+</html>
